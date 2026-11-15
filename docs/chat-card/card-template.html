@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 var(--font-sans); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .card { display: flex; flex-direction: column; gap: 10px; }
+  .head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .head b { font-size: 14px; }
+  .muted { color: var(--muted-foreground); }
+  .mono { font-family: var(--font-mono); font-size: 11.5px; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+  .pill.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .crumb { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+  .crumb .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .iconbtn { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: var(--background); display: grid; place-items: center; padding: 0; }
+  .iconbtn:disabled { opacity: .35; cursor: default; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; background: var(--background); }
+  .seg button { border: 0; background: none; padding: 3px 9px; font-size: 12px; color: var(--muted-foreground); }
+  .seg button.on { background: var(--secondary); color: var(--foreground); font-weight: 500; }
+  .seg button.annot.on { background: var(--primary); color: var(--primary-foreground); }
+
+  .stage { position: relative; height: 420px; overflow: auto; border-radius: var(--radius); background: var(--secondary); border: 1px solid var(--border); padding: 12px; overscroll-behavior: contain; }
+  .frame { position: relative; margin: 0 auto; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 0 var(--border), 0 6px 20px color-mix(in srgb, var(--foreground) 10%, transparent); }
+  .frame img { display: block; width: 100%; height: auto; }
+  .frame.annotating { cursor: crosshair; }
+  .hot { position: absolute; border-radius: 4px; border: 1.5px solid transparent; background: transparent; padding: 0; transition: background-color .12s, border-color .12s; }
+  .show-hot .hot { border-color: color-mix(in srgb, var(--primary) 70%, transparent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+  .hot:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 22%, transparent); }
+  .annotating .hot { pointer-events: none; }
+  .pin { position: absolute; width: 22px; height: 22px; margin: -22px 0 0 -2px; border-radius: 50% 50% 50% 2px; background: var(--primary); color: var(--primary-foreground); font: 700 11px/22px var(--font-sans); text-align: center; box-shadow: 0 2px 6px color-mix(in srgb, var(--foreground) 30%, transparent); pointer-events: none; }
+  .tip { position: absolute; left: 12px; bottom: 12px; padding: 3px 8px; border-radius: 6px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); font-size: 11px; pointer-events: none; opacity: 0; transition: opacity .12s; }
+  .tip.on { opacity: 1; }
+
+  .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; height: 176px; }
+  .box { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  .kv { display: grid; grid-template-columns: 62px 1fr; gap: 3px 8px; font-size: 12px; }
+  .kv span:nth-child(odd) { color: var(--muted-foreground); }
+  .kv span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notes { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  .note { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: start; font-size: 12px; }
+  .note .n { width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font: 700 9px/16px var(--font-sans); text-align: center; margin-top: 1px; }
+  .note small { display: block; color: var(--muted-foreground); font-size: 10.5px; }
+  .note .x { border: 0; background: none; color: var(--muted-foreground); padding: 0 2px; }
+  .compose { display: flex; gap: 6px; }
+  .compose input { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 7px; border: 1px solid var(--primary); background: var(--background); color: var(--foreground); outline: none; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 5px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--background); font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .empty { color: var(--muted-foreground); font-size: 12px; margin: auto 0; text-align: center; line-height: 1.5; }
+  textarea.fallback { width: 100%; height: 100%; font: 11px/1.4 var(--font-mono); border-radius: 7px; border: 1px solid var(--border); background: var(--code-background); color: var(--foreground); padding: 6px 8px; resize: none; }
+
+  .grp { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); margin: 2px 0 6px; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .th { border: 0; padding: 0; background: none; text-align: left; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .th .img { aspect-ratio: 16 / 10; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--secondary); }
+  .th .img.m { aspect-ratio: 16 / 10; }
+  .th img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .th.on .img { box-shadow: 0 0 0 2px var(--primary); border-color: transparent; }
+  .th .l { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th .r { font: 10px var(--font-mono); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #store { display: none; }
+  @media (max-width: 560px) {
+    .panel { grid-template-columns: 1fr; height: auto; }
+    .panel .box { height: 170px; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .stage { height: 360px; }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head" id="head"></div>
+  <div class="bar">
+    <div class="crumb">
+      <button class="iconbtn" id="back" title="Back" disabled>←</button>
+      <span class="t" id="title"></span><span class="mono muted" id="route" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    </div>
+    <div class="seg" id="vp"><button data-v="desktop" class="on">Desktop</button><button data-v="mobile">Mobile</button></div>
+    <div class="seg" id="cs"><button data-v="light" class="on">Light</button><button data-v="dark">Dark</button></div>
+    <div class="seg" id="mode"><button data-v="browse" class="on">Click through</button><button data-v="annotate" class="annot">Annotate</button></div>
+  </div>
+  <div class="stage" id="stage"><div class="frame" id="frame"><img id="shot" alt=""></div><div class="tip" id="tip"></div></div>
+  <div class="panel">
+    <div class="box"><div class="kv" id="kv"></div></div>
+    <div class="box" id="nbox"></div>
+  </div>
+  <div id="strip"></div>
+</div>
+<div id="store">
+<!--STORE-->
+</div>
+<script>
+/*DATA*/
+const $ = (id) => document.getElementById(id);
+const byId = Object.fromEntries(DATA.screens.map((s) => [s.id, s]));
+const store = {};
+document.querySelectorAll('#store img').forEach((img) => { store[img.dataset.k] = img; });
+const st = { id: DATA.screens.find((s) => s.persona === 'admin')?.id ?? DATA.screens[0].id, vp: 'desktop', cs: 'light', mode: 'browse', history: [], notes: [], copied: null };
+const variant = () => `${st.vp}-${st.cs}`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const short = (id) => id.replace(/^\w+:/, '');
+
+const r = DATA.run;
+$('head').innerHTML = `<b>${esc(r.target)}</b><span class="pill">${esc(r.label ?? 'run')}</span><span class="pill">${esc(r.branch)}@${esc(r.commit)}${r.dirty ? '*' : ''}</span><span class="muted">${DATA.screens.length} screens · ${DATA.transitions} links</span>${DATA.gaps.length ? `<span class="pill warn" title="${esc(DATA.gaps.join('\n'))}">${DATA.gaps.length} unreached</span>` : ''}`;
+
+function go(id, push = true) {
+  if (id === st.id) return;
+  if (push) st.history.push(st.id);
+  st.id = id;
+  render();
+  $('stage').scrollTop = 0;
+}
+
+function render() {
+  const s = byId[st.id];
+  const v = variant();
+  const meta = s.shots[v];
+  $('title').textContent = s.state ? `${s.title} · ${s.state}` : s.title;
+  $('route').textContent = short(s.id);
+  $('back').disabled = st.history.length === 0;
+
+  // Stage
+  const frame = $('frame');
+  const shot = $('shot');
+  shot.src = store[`${s.id}|${v}`]?.src ?? '';
+  const stageW = $('stage').clientWidth - 24;
+  const w = st.vp === 'desktop' ? stageW : Math.min(300, stageW);
+  frame.style.width = `${w}px`;
+  frame.classList.toggle('annotating', st.mode === 'annotate');
+  frame.querySelectorAll('.hot, .pin').forEach((el) => el.remove());
+  const scale = w / meta.w;
+  // Link bounds were measured on the desktop layout, so hotspots are shown on desktop shots.
+  if (st.vp === 'desktop') {
+    for (const l of s.links) {
+      const b = document.createElement('button');
+      b.className = 'hot';
+      Object.assign(b.style, { left: `${l.b[0] * scale}px`, top: `${l.b[1] * scale}px`, width: `${l.b[2] * scale}px`, height: `${l.b[3] * scale}px` });
+      b.title = `${l.label} → ${short(l.to)}`;
+      b.onmouseenter = () => tip(`${l.label}  →  ${short(l.to)}`);
+      b.onmouseleave = () => tip('');
+      b.onclick = (e) => { e.stopPropagation(); tip(''); go(l.to); };
+      frame.appendChild(b);
+    }
+  }
+  st.notes.forEach((n, i) => {
+    if (n.screen !== s.id || n.variant !== v) return;
+    const p = document.createElement('div');
+    p.className = 'pin';
+    p.textContent = String(i + 1);
+    Object.assign(p.style, { left: `${n.x * scale}px`, top: `${n.y * scale}px` });
+    frame.appendChild(p);
+  });
+
+  // Info
+  const reachable = s.links.length;
+  $('kv').innerHTML = [
+    ['Screen', `<span class="mono">${esc(s.id)}</span>`],
+    ['URL', `<span class="mono">${esc(r.baseURL + s.url)}</span>`],
+    ['User', esc(s.persona)],
+    ['Variant', `${st.vp} ${meta.w}×${meta.h} · ${st.cs}`],
+    ['Source', s.source ? `<span class="mono" title="${esc(s.source)}">${esc(s.source.replace(/^resources\/js\/pages\//, '…/'))}</span>` : '<span class="muted">unknown</span>'],
+    ['Links', reachable ? `${reachable} in scope${st.vp === 'desktop' ? ' · <span class="muted">click them on the shot</span>' : ' · <span class="muted">clickable on desktop</span>'}` : '<span class="muted">none</span>'],
+  ].map(([k, val]) => `<span>${k}</span><span>${val}</span>`).join('');
+
+  renderNotes();
+
+  // Strip
+  const groups = {};
+  for (const sc of DATA.screens) (groups[sc.persona] ??= []).push(sc);
+  $('strip').innerHTML = Object.entries(groups).map(([p, list]) => `
+    <div class="grp">${esc(p)} · ${list.length}</div>
+    <div class="grid" style="margin-bottom:12px">${list.map((sc) => `
+      <button class="th${sc.id === st.id ? ' on' : ''}" data-id="${esc(sc.id)}">
+        <div class="img"><img src="${store[`${sc.id}|${v}`]?.src ?? ''}" alt=""></div>
+        <span class="l">${esc(sc.state ?? sc.title)}</span><span class="r">${esc(short(sc.id))}</span>
+      </button>`).join('')}</div>`).join('');
+  $('strip').querySelectorAll('.th').forEach((b) => { b.onclick = () => go(b.dataset.id); });
+}
+
+function renderNotes() {
+  const box = $('nbox');
+  if (st.copied) {
+    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12px">${st.copied.ok ? 'Copied for agent ✓' : 'Press ⌘C to copy'}</b><button class="btn" id="done">Done</button></div><textarea class="fallback" id="fb" readonly>${esc(st.copied.text)}</textarea>`;
+    $('done').onclick = () => { st.copied = null; renderNotes(); };
+    if (!st.copied.ok) { $('fb').focus(); $('fb').select(); }
+    return;
+  }
+  const pending = st.pending;
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:12px">Change request</b><span class="muted" style="font-size:11px">${st.notes.length} note${st.notes.length === 1 ? '' : 's'}</span></div>
+    ${pending ? `<div class="compose"><input id="ni" placeholder="${pending.link ? `On “${esc(pending.link.label)}”…` : 'What should change here?'}"><button class="btn" id="na">Add</button></div>` : ''}
+    <div class="notes">${st.notes.length ? st.notes.map((n, i) => `
+      <div class="note"><span class="n">${i + 1}</span><div>${esc(n.text)}<small>${esc(short(n.screen))} · ${esc(n.variant)}${n.link ? ` · on “${esc(n.link.label)}”` : ''}</small></div><button class="x" data-i="${i}" title="Remove">×</button></div>`).join('')
+      : pending ? '' : `<div class="empty">${st.mode === 'annotate' ? 'Click anywhere on the screenshot to pin a note.' : 'Switch to <b>Annotate</b> and click the screenshot<br>to pin notes for an agent.'}</div>`}</div>
+    <button class="btn primary" id="copy" ${st.notes.length ? '' : 'disabled'}>⧉ Copy for agent</button>`;
+  box.querySelectorAll('.x').forEach((b) => { b.onclick = () => { st.notes.splice(Number(b.dataset.i), 1); render(); }; });
+  if (pending) {
+    const add = () => {
+      const text = $('ni').value.trim();
+      if (!text) return;
+      st.notes.push({ ...pending, text });
+      st.pending = null;
+      render();
+    };
+    $('na').onclick = add;
+    $('ni').onkeydown = (e) => { if (e.key === 'Enter') add(); if (e.key === 'Escape') { st.pending = null; renderNotes(); } };
+    $('ni').focus();
+  }
+  $('copy').onclick = copyForAgent;
+}
+
+function prompt() {
+  const lines = [];
+  const screens = [...new Set(st.notes.map((n) => n.screen))];
+  lines.push(`## Change request (${st.notes.length} note${st.notes.length === 1 ? '' : 's'}, ${screens.length} screen${screens.length === 1 ? '' : 's'})`);
+  lines.push(`App: ${r.target} · ${r.baseURL} · repo ${r.repo} · ${r.branch}@${r.commit}${r.dirty ? ' (uncommitted changes)' : ''}`);
+  for (const id of screens) {
+    const s = byId[id];
+    lines.push('', `### ${s.state ? `${s.title} · ${s.state}` : s.title}`);
+    lines.push(`Screen: ${id}`, `Open: ${r.baseURL}${s.url} signed in as \`${s.persona}\`${s.state ? ` (then the "${s.state}" state steps)` : ''}`);
+    if (s.source) lines.push(`Source: ${s.source}`);
+    st.notes.forEach((n, i) => {
+      if (n.screen !== id) return;
+      const sh = s.shots[n.variant];
+      lines.push(`${i + 1}. ${n.text}`);
+      lines.push(`   At ${Math.round(n.x)},${Math.round(n.y)} on the ${n.variant} shot (${sh.w}×${sh.h})${n.link ? `, on link "${n.link.label}" → ${n.link.to}` : ''}`);
+      lines.push(`   Screenshot: ${store[`${id}|${n.variant}`]?.dataset.path ?? `run ${r.label}, ${id} ${n.variant}`}`);
+    });
+  }
+  lines.push('', `Check it: spider-web review --screens ${screens.join(',')} --json  (exit 0 = unchanged, 1 = changed)`);
+  return lines.join('\n');
+}
+
+async function copyForAgent() {
+  const text = prompt();
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+  if (!ok) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+  st.copied = { ok, text };
+  renderNotes();
+}
+
+function tip(text) { const t = $('tip'); t.textContent = text; t.classList.toggle('on', !!text); }
+
+$('frame').addEventListener('click', (e) => {
+  if (st.mode !== 'annotate') return;
+  const s = byId[st.id];
+  const meta = s.shots[variant()];
+  const rect = $('frame').getBoundingClientRect();
+  const scale = rect.width / meta.w;
+  const x = (e.clientX - rect.left) / scale, y = (e.clientY - rect.top) / scale;
+  const link = st.vp === 'desktop' ? s.links.find((l) => x >= l.b[0] && x <= l.b[0] + l.b[2] && y >= l.b[1] && y <= l.b[1] + l.b[3]) : undefined;
+  st.pending = { screen: s.id, variant: variant(), x, y, link };
+  st.notes.push({ ...st.pending, text: '…' });
+  render();
+  st.notes.pop();
+  renderNotes();
+});
+
+function seg(id, key) {
+  $(id).querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      st[key] = b.dataset.v;
+      $(id).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      if (key === 'mode') { st.pending = null; $('frame').parentElement.classList.toggle('show-hot', false); }
+      render();
+    };
+  });
+}
+seg('vp', 'vp'); seg('cs', 'cs'); seg('mode', 'mode');
+$('back').onclick = () => { const prev = st.history.pop(); if (prev) go(prev, false); };
+$('shot').addEventListener('load', () => render.lastSrc !== $('shot').src && (render.lastSrc = $('shot').src));
+render();
+</script>
+</body>
+</html>

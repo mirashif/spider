@@ -1,0 +1,489 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --term-fg: var(--foreground); }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 var(--font-sans); }
+  .wrap { display: flex; flex-direction: column; gap: 40px; }
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .eyebrow { font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); }
+  h2 { margin: 2px 0 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .lede { margin: 0; color: var(--muted-foreground); }
+
+  /* App window */
+  .win { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--card-foreground); overflow: hidden; font-size: 12px; }
+  .chrome { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--secondary); }
+  .dots { display: flex; gap: 5px; } .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--border); display: block; }
+  .chrome .title { font-weight: 600; }
+  .chrome .sp { flex: 1; }
+  .kbd { font: 11px var(--font-mono); padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted-foreground); background: var(--background); }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+  .pill.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+  .pill.lock { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 35%, transparent); }
+  .pill.mod { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 35%, transparent); }
+  .pill.add { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+  .pill.bad { color: var(--destructive); border-color: color-mix(in srgb, var(--destructive) 35%, transparent); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font: 500 12px var(--font-sans); white-space: nowrap; }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+  .btn.ghost { background: transparent; }
+  .muted { color: var(--muted-foreground); }
+  .mono { font-family: var(--font-mono); font-size: 11px; }
+
+  .body { display: grid; grid-template-columns: 132px 1fr; min-height: 0; }
+  .side { border-right: 1px solid var(--border); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; background: var(--secondary); }
+  .side .nav { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 6px; color: var(--muted-foreground); }
+  .side .nav.on { background: var(--background); color: var(--foreground); font-weight: 500; box-shadow: 0 0 0 1px var(--border); }
+  .side .grp { margin: 10px 8px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .main { padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+  /* Stepper */
+  .steps { display: flex; gap: 6px; align-items: center; }
+  .step { display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); }
+  .step b { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; border: 1px solid var(--border); }
+  .step.done b { background: var(--success); color: var(--background); border-color: transparent; }
+  .step.on { color: var(--foreground); font-weight: 600; }
+  .step.on b { border-color: var(--primary); color: var(--primary); }
+  .steps .line { flex: 1; height: 1px; background: var(--border); }
+
+  .detected { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+  .detected .ico { width: 26px; height: 26px; border-radius: 6px; background: color-mix(in srgb, var(--destructive) 15%, transparent); color: var(--destructive); display: grid; place-items: center; font-weight: 700; font-size: 11px; }
+
+  .tree { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tree .bar { display: flex; gap: 6px; padding: 7px 8px; border-bottom: 1px solid var(--border); align-items: center; }
+  .search { flex: 1; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); background: var(--background); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg span { padding: 3px 8px; color: var(--muted-foreground); }
+  .seg span.on { background: var(--secondary); color: var(--foreground); font-weight: 500; }
+  .row { display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center; padding: 5px 10px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  .row:last-child { border-bottom: 0; }
+  .row.dim { opacity: .5; }
+  .cb { width: 13px; height: 13px; border-radius: 3px; border: 1.5px solid var(--muted-foreground); display: grid; place-items: center; font-size: 9px; line-height: 1; }
+  .cb.on { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .cb.part { border-color: var(--primary); color: var(--primary); }
+  .param { font: 11px var(--font-mono); padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); }
+  .foot { display: flex; align-items: center; gap: 8px; }
+  .foot .sp { flex: 1; }
+
+  /* Fake screenshots */
+  .ph { background: var(--background); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; position: relative; }
+  .ph .tb { height: 9px; background: var(--secondary); border-bottom: 1px solid var(--border); }
+  .ph .ln { height: 4px; border-radius: 2px; background: var(--border); margin: 5px 6px 0; }
+  .ph .ln.s { width: 40%; } .ph .ln.m { width: 65%; }
+  .ph .blk { height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--border) 70%, transparent); margin: 5px 6px 0; }
+
+  /* Map */
+  .map { position: relative; height: 252px; border: 1px solid var(--border); border-radius: 8px; background-image: radial-gradient(color-mix(in srgb, var(--border) 80%, transparent) 1px, transparent 1px); background-size: 14px 14px; overflow: hidden; }
+  .map svg { position: absolute; inset: 0; }
+  .map svg path { fill: none; stroke: var(--muted-foreground); stroke-opacity: .45; stroke-width: 1.2; }
+  .node { position: absolute; width: 96px; display: flex; flex-direction: column; gap: 4px; }
+  .node .ph { height: 58px; }
+  .node .lbl { font: 10px var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node.pending .ph { border-style: dashed; opacity: .55; }
+  .node.sel .ph { box-shadow: 0 0 0 2px var(--primary); }
+  .node .new { position: absolute; top: -6px; right: -6px; }
+  .progress { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); }
+  .meter { flex: 1; height: 5px; border-radius: 3px; background: var(--secondary); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 72%; background: var(--primary); }
+  .spin { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--primary); }
+
+  /* Annotate */
+  .annot { display: grid; grid-template-columns: 1fr 196px; gap: 12px; }
+  .canvas { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: var(--secondary); }
+  .page { background: var(--background); border: 1px solid var(--border); border-radius: 6px; height: 236px; position: relative; overflow: hidden; }
+  .page .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--foreground) 12%, transparent); }
+  .dialog { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); width: 64%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 12%, transparent); }
+  .dialog .h { font-weight: 600; font-size: 12px; }
+  .field { height: 22px; border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; color: var(--muted-foreground); font-size: 11px; }
+  .field.err { border-color: var(--destructive); }
+  .errtxt { color: var(--destructive); font-size: 10px; margin-top: -4px; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+  .mini { padding: 3px 9px; border-radius: 5px; font-size: 11px; border: 1px solid var(--border); }
+  .mini.p { background: var(--foreground); color: var(--background); border-color: transparent; position: relative; }
+  .target { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .pin { position: absolute; width: 20px; height: 20px; border-radius: 50% 50% 50% 2px; background: var(--primary); color: var(--primary-foreground); font: 700 10px/20px var(--font-sans); text-align: center; box-shadow: 0 2px 6px color-mix(in srgb, var(--foreground) 25%, transparent); }
+  .pin.b { background: var(--destructive); color: var(--background); }
+  .region { position: absolute; border: 2px dashed var(--destructive); border-radius: 4px; }
+  .elchip { position: absolute; left: 12px; bottom: 12px; right: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--popover); border: 1px solid var(--border); font-size: 11px; }
+  .tools { position: absolute; top: 18px; left: 18px; display: flex; flex-direction: column; gap: 2px; padding: 3px; background: var(--popover); border: 1px solid var(--border); border-radius: 7px; }
+  .tools span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; font-size: 11px; color: var(--muted-foreground); }
+  .tools span.on { background: var(--primary); color: var(--primary-foreground); }
+  .tray { display: flex; flex-direction: column; gap: 8px; }
+  .compose { border: 1px solid var(--primary); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--background); }
+  .kinds { display: flex; gap: 4px; flex-wrap: wrap; }
+  .kinds span { font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted-foreground); }
+  .kinds span.on { background: var(--accent); color: var(--accent-foreground); border-color: transparent; }
+  .note { display: grid; grid-template-columns: 18px 1fr; gap: 6px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .note .n { width: 16px; height: 16px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font: 700 9px/16px var(--font-sans); text-align: center; }
+  .note .n.b { background: var(--destructive); color: var(--background); }
+  .note p { margin: 0; }
+  .note small { color: var(--muted-foreground); font-size: 10px; display: block; margin-top: 2px; }
+  .split { display: flex; } .split .btn:first-child { border-radius: 7px 0 0 7px; flex: 1; justify-content: center; } .split .btn:last-child { border-radius: 0 7px 7px 0; border-left: 1px solid color-mix(in srgb, var(--primary-foreground) 30%, transparent); padding: 5px 7px; }
+
+  /* Journey */
+  .jhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .jhead .t { font-weight: 600; font-size: 13px; }
+  .strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: start; }
+  .card { display: flex; flex-direction: column; gap: 6px; position: relative; padding-right: 14px; }
+  .card:not(:last-child)::after { content: "›"; position: absolute; right: 2px; top: 30px; color: var(--muted-foreground); font-size: 15px; }
+  .card .ph { height: 74px; }
+  .card .num { font: 600 10px var(--font-mono); color: var(--muted-foreground); }
+  .card .act { font-size: 11px; line-height: 1.3; }
+  .card .act code { font: 10px var(--font-mono); color: var(--muted-foreground); display: block; margin-top: 2px; overflow-wrap: anywhere; }
+  .card.proposed .ph { border: 1.5px dashed var(--info); background: color-mix(in srgb, var(--info) 6%, var(--background)); }
+  .card.fail .ph { box-shadow: 0 0 0 2px var(--destructive); }
+  .hot { position: absolute; border: 1.5px solid var(--primary); border-radius: 3px; background: color-mix(in srgb, var(--primary) 18%, transparent); }
+  .sketch { position: absolute; inset: 14px 10px; border: 1.5px dashed var(--info); border-radius: 4px; display: grid; place-items: center; color: var(--info); font-size: 10px; text-align: center; padding: 4px; }
+  .runs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+  .tick { display: inline-flex; gap: 3px; } .tick i { width: 14px; height: 6px; border-radius: 2px; background: var(--success); display: block; } .tick i.f { background: var(--destructive); } .tick i.p { background: transparent; border: 1px dashed var(--info); }
+
+  /* Review */
+  .review { display: grid; grid-template-columns: 178px 1fr; gap: 12px; }
+  .chg { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .chg .it { padding: 7px 9px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 3px; }
+  .chg .it:last-child { border-bottom: 0; }
+  .chg .it.on { background: var(--secondary); box-shadow: inset 2px 0 0 var(--primary); }
+  .chg .it .r { font: 10.5px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slider { position: relative; height: 200px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  .slider .half { position: absolute; top: 0; bottom: 0; padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--background); }
+  .slider .l { left: 0; width: 50%; }
+  .slider .rr { left: 50%; right: 0; }
+  .slider .handle { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--primary); }
+  .slider .handle::after { content: "⇆"; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; font-size: 11px; }
+  .slider .tag { position: absolute; top: 8px; font: 600 10px var(--font-sans); padding: 1px 6px; border-radius: 4px; background: var(--popover); border: 1px solid var(--border); }
+  .slider .bbtn { align-self: flex-end; margin-top: auto; padding: 5px 12px; border-radius: 6px; font-size: 11px; background: var(--foreground); color: var(--background); }
+  .slider .bbtn.new { outline: 2px dashed var(--destructive); outline-offset: 3px; }
+  .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Terminal */
+  .cli { display: grid; gap: 10px; }
+  .term { border-radius: var(--radius); background: var(--code-background); border: 1px solid var(--border); overflow: hidden; }
+  .term .th { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); font: 600 11px var(--font-sans); color: var(--muted-foreground); }
+  .term .th .tagx { font-weight: 500; padding: 0 6px; border-radius: 4px; border: 1px solid var(--border); }
+  .term pre { margin: 0; padding: 12px 14px; font: 11.5px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--term-fg); }
+  .p { color: var(--muted-foreground); user-select: none; }
+  .c { color: var(--foreground); font-weight: 600; }
+  .ok { color: var(--success); } .wn { color: var(--warning); } .er { color: var(--destructive); } .in { color: var(--info); }
+  .dm { color: var(--muted-foreground); }
+  .k { color: var(--chart-2); } .s { color: var(--chart-1); } .nm { color: var(--chart-4); }
+  .hl { background: color-mix(in srgb, var(--primary) 18%, transparent); border-radius: 3px; }
+
+  .conv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .conv div { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .conv b { display: block; font-size: 12px; margin-bottom: 2px; }
+  .conv span { color: var(--muted-foreground); font-size: 12px; }
+  .conv code { font: 11px var(--font-mono); }
+  .codes { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; margin-top: 4px; }
+  .codes code { font: 11px var(--font-mono); }
+  @media (max-width: 600px) {
+    .body { grid-template-columns: 1fr; } .side { display: none; }
+    .annot, .review { grid-template-columns: 1fr; }
+    .strip { grid-template-columns: repeat(3, 1fr); row-gap: 12px; }
+    .conv { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- 1. FIRST LAUNCH -->
+<section>
+  <div>
+    <div class="eyebrow">1 · First launch</div>
+    <h2>Pick the routes to map</h2>
+    <p class="lede">Routes are read from the framework, then checked with one quick request each, so you can see status before anything is crawled.</p>
+  </div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="title">spider-web</span><span class="muted">· New project</span><span class="sp"></span><span class="kbd">⌘K</span></div>
+    <div class="main">
+      <div class="steps">
+        <div class="step done"><b>✓</b>App</div><div class="line"></div>
+        <div class="step on"><b>2</b>Routes</div><div class="line"></div>
+        <div class="step"><b>3</b>Sign in</div><div class="line"></div>
+        <div class="step"><b>4</b>First run</div>
+      </div>
+      <div class="detected">
+        <div class="ico">L</div>
+        <div style="flex:1"><b>localhost</b> <span class="muted">· Laravel · ../example-app</span><br><span class="muted">34 routes from <span class="mono">sail artisan route:list</span> · checked in 2.1s</span></div>
+        <span class="pill ok">22 open</span><span class="pill lock">9 sign-in</span>
+      </div>
+      <div class="tree">
+        <div class="bar"><div class="search">⌕ Filter routes…</div><div class="seg"><span class="on">Suggested</span><span>All</span><span>None</span></div></div>
+        <div class="row"><span class="cb on">✓</span><span class="mono">/</span><span class="pill ok">200</span></div>
+        <div class="row"><span class="cb on">✓</span><span class="mono">/admin/login</span><span class="pill ok">200</span></div>
+        <div class="row"><span class="cb part">–</span><span class="mono">▾ /admin <span class="muted">· 3 of 7</span></span><span class="pill lock">🔒 sign-in</span></div>
+        <div class="row" style="padding-left:30px"><span class="cb on">✓</span><span class="mono">projects</span><span class="pill lock">🔒</span></div>
+        <div class="row" style="padding-left:30px"><span class="cb on">✓</span><span class="mono">projects/<span class="param">:project</span> = alpha ✎</span><span class="muted">sample from crawl</span></div>
+        <div class="row" style="padding-left:30px"><span class="cb on">✓</span><span class="mono">admins</span><span class="pill lock">🔒</span></div>
+        <div class="row" style="padding-left:30px"><span class="cb"></span><span class="mono">▸ owner-invitations/<span class="param">:token</span></span><span class="pill bad">needs token</span></div>
+        <div class="row dim"><span class="cb"></span><span class="mono">▸ /captain-api <span class="muted">· 3 JSON routes</span></span><span class="muted">hidden</span></div>
+      </div>
+      <div class="foot"><span class="muted">5 routes · desktop, light · <b style="color:var(--foreground)">≈ 12s</b></span><span class="sp"></span><button class="btn ghost">Back</button><button class="btn primary">Continue → Sign in</button></div>
+    </div>
+  </div>
+  <div class="cli">
+    <div class="term"><div class="th">Terminal <span class="tagx">interactive</span></div><pre><span class="p">$ </span><span class="c">spider-web init</span>
+  App      <span class="s">http://localhost</span>     <span class="dm">found :80 Laravel, :5173 Vite</span>
+  Project  <span class="s">../example-app</span>     <span class="dm">Laravel · route:list via Sail</span>
+<span class="ok">✓</span> 34 routes, checked in 2.1s  <span class="dm">22 open · 9 sign-in · 3 JSON hidden</span>
+
+  Pick routes  <span class="dm">space toggle · → open · / filter · s suggested</span>
+  <span class="ok">[x]</span> /                                 <span class="ok">200</span>
+  <span class="ok">[x]</span> /admin/login                   <span class="ok">200</span>
+  <span class="in">[~]</span> /admin  <span class="dm">3 of 7</span>                 <span class="wn">sign-in</span>
+<span class="hl">      <span class="ok">[x]</span> projects/<span class="in">:project</span> = alpha                 </span>
+      <span class="dm">[ ]</span> owner-invitations/<span class="in">:token</span>      <span class="er">needs token</span>
+  <span class="dm">5 selected · ≈ 12s · enter to continue</span></pre></div>
+    <div class="term"><div class="th">Agent <span class="tagx">--json · never prompts</span></div><pre><span class="p">$ </span><span class="c">spider-web routes --json</span>
+{<span class="k">"routes"</span>:[{<span class="k">"pattern"</span>:<span class="s">"/admin/projects/:project"</span>,<span class="k">"status"</span>:<span class="nm">302</span>,<span class="k">"signIn"</span>:<span class="nm">true</span>,
+  <span class="k">"samples"</span>:{<span class="k">"tenant"</span>:[<span class="s">"alpha"</span>,<span class="s">"beta"</span>]}}, …], <span class="k">"hidden"</span>:<span class="nm">3</span>}
+
+<span class="p">$ </span><span class="c">spider-web init --yes --url http://localhost \
+    --route / --route '/admin/**' --exclude '/admin/*-invitations/**' \
+    --param tenant=alpha --json</span>
+{<span class="k">"config"</span>:<span class="s">"spider.config.ts"</span>,<span class="k">"routes"</span>:<span class="nm">5</span>,<span class="k">"needsSignIn"</span>:[<span class="s">"admin"</span>],
+ <span class="k">"next"</span>:<span class="s">"spider-web login admin"</span>}</pre></div>
+  </div>
+</section>
+
+<!-- 2. MAP + CRAWL -->
+<section>
+  <div>
+    <div class="eyebrow">2 · Sign in and first run</div>
+    <h2>The map fills in while it crawls</h2>
+    <p class="lede">Sign-in happens in a real browser window. Progress stays in a bar at the bottom, so you can open any screen that's already done.</p>
+  </div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="title">Example App ▾</span><span class="sp"></span><span class="pill">main@3f2a1c9*</span><span class="kbd">⌘K</span></div>
+    <div class="body">
+      <div class="side">
+        <div class="nav on">Map</div>
+        <div class="nav">Screens <span class="muted">12</span></div>
+        <div class="nav">Journeys <span class="muted">2</span></div>
+        <div class="nav">Requests <span class="pill" style="padding:0 5px">3</span></div>
+        <div class="nav">Reviews</div>
+        <div class="grp">Users</div>
+        <div class="nav">● visitor</div>
+        <div class="nav">● admin</div>
+        <div class="grp">Project</div>
+        <div class="nav">Settings</div>
+      </div>
+      <div class="main">
+        <div class="map">
+          <svg width="100%" height="100%" viewBox="0 0 560 252" preserveAspectRatio="none">
+            <path d="M110 52 C140 52 150 52 180 52"/><path d="M110 52 C150 52 140 160 180 160"/>
+            <path d="M276 52 C310 52 316 52 346 52"/><path d="M276 52 C316 52 306 160 346 160"/>
+            <path d="M442 52 C470 52 470 120 470 150"/>
+          </svg>
+          <div class="node" style="left:14px;top:22px"><div class="ph"><div class="tb"></div><div class="ln m"></div><div class="blk"></div><div class="ln s"></div></div><div class="lbl">/</div></div>
+          <div class="node" style="left:180px;top:22px"><div class="ph"><div class="tb"></div><div class="ln s"></div><div class="blk"></div><div class="blk"></div></div><div class="lbl">/admin/projects</div></div>
+          <div class="node" style="left:180px;top:130px"><div class="ph"><div class="tb"></div><div class="ln m"></div><div class="ln s"></div><div class="blk"></div></div><div class="lbl">/admin/login</div></div>
+          <div class="node sel" style="left:346px;top:22px"><div class="ph"><div class="tb"></div><div class="ln s"></div><div class="blk"></div><div class="ln m"></div></div><div class="lbl">…/projects/:project</div></div>
+          <div class="node" style="left:346px;top:130px"><div class="ph"><div class="tb"></div><div class="blk"></div><div class="ln m"></div><div class="ln s"></div></div><div class="lbl">/admin/admins</div><span class="pill add new" style="background:var(--card)">new</span></div>
+          <div class="node pending" style="left:430px;top:150px"><div class="ph"></div><div class="lbl muted">…/:project/edit</div></div>
+        </div>
+        <div class="progress"><span class="spin"></span><span><b>admin</b> <span class="muted">9 of 12</span></span><div class="meter"><i></i></div><span class="mono muted">/admin/projects/:project/edit</span><button class="btn ghost" style="padding:2px 8px">Stop</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="cli">
+    <div class="term"><div class="th">Terminal <span class="tagx">interactive</span></div><pre><span class="p">$ </span><span class="c">spider-web login admin</span>
+  Opening a browser. Sign in, then close the window.
+<span class="ok">✓</span> Saved the admin session  <span class="dm">.spider/auth/admin.json</span>
+
+<span class="p">$ </span><span class="c">spider-web crawl</span>
+  visitor  <span class="ok">████████████████</span>  3/3
+  admin    <span class="in">███████████</span><span class="dm">░░░░░</span>  9/12  <span class="dm">/admin/projects/:project/edit</span>
+<span class="ok">✓</span> 15 screens · 21 links · 18s  <span class="dm">→ view at http://localhost:4320/?run=0912</span>
+<span class="wn">!</span> 1 gap: /admin/owner-invitations/:token was not reached</pre></div>
+    <div class="term"><div class="th">Agent <span class="tagx">result on stdout · progress events on stderr</span></div><pre><span class="p">$ </span><span class="c">spider-web crawl --json 2&gt;progress.ndjson</span>
+{<span class="k">"run"</span>:<span class="s">"example-app_20261115-0912"</span>,<span class="k">"screens"</span>:<span class="nm">15</span>,<span class="k">"transitions"</span>:<span class="nm">21</span>,
+ <span class="k">"gaps"</span>:[{<span class="k">"kind"</span>:<span class="s">"unreached-route"</span>,<span class="k">"route"</span>:<span class="s">"/admin/owner-invitations/:token"</span>}]}
+<span class="dm"># progress.ndjson, one event per line</span>
+<span class="dm">{"event":"screen","persona":"admin","route":"/admin/admins","done":9,"total":12}</span>
+
+<span class="p">$ </span><span class="c">spider-web crawl --as admin --json</span>   <span class="dm"># session expired</span>
+{<span class="k">"error"</span>:<span class="s">"needs-sign-in"</span>,<span class="k">"persona"</span>:<span class="s">"admin"</span>,<span class="k">"next"</span>:<span class="s">"ask the user to run: spider-web login admin"</span>}
+<span class="er">exit 3</span></pre></div>
+  </div>
+</section>
+
+<!-- 3. ANNOTATE -->
+<section>
+  <div>
+    <div class="eyebrow">3 · Annotate and request changes</div>
+    <h2>Pin notes to real elements, then hand them to an agent</h2>
+    <p class="lede">Clicking snaps to the element recorded at crawl time. Copy for agent builds a prompt with repro steps, element details, styles, source file and close-up crops.</p>
+  </div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="title">admin:/admin/admins</span><span class="muted">#Invite admin dialog</span><span class="sp"></span><span class="seg"><span class="on">Desktop</span><span>Mobile</span></span><span class="seg"><span class="on">Light</span><span>Dark</span></span></div>
+    <div class="main">
+      <div class="annot">
+        <div class="canvas">
+          <div class="page">
+            <div class="ph" style="border:0;border-radius:0;height:100%"><div class="tb" style="height:14px"></div><div class="ln s"></div><div class="blk"></div><div class="blk"></div><div class="blk"></div><div class="blk"></div></div>
+            <div class="scrim"></div>
+            <div class="dialog">
+              <div class="h">Invite admin</div>
+              <div class="field">Name</div>
+              <div class="field err">jane@</div>
+              <div class="errtxt">Enter a valid email address.</div>
+              <div class="dlg-actions"><span class="mini">Cancel</span><span class="mini p target">Invite</span></div>
+            </div>
+            <div class="pin" style="left:calc(82% - 6px);top:150px">1</div>
+            <div class="region" style="left:20%;top:94px;width:60%;height:40px"></div>
+            <div class="pin b" style="left:calc(80% - 4px);top:80px">2</div>
+          </div>
+          <div class="tools"><span class="on">◎</span><span>▭</span><span>↗</span><span>T</span></div>
+          <div class="elchip"><b>button "Invite"</b><span class="mono muted">[data-testid=admin-invite-submit]</span><span class="mono muted">Admins/Index.tsx:142</span><span class="muted">14px/500 · #111827</span></div>
+        </div>
+        <div class="tray">
+          <div class="compose">
+            <div class="kinds"><span>Bug</span><span class="on">Change</span><span>Copy</span><span>Question</span></div>
+            <div style="min-height:34px">Primary button should say "Send invite"<span style="border-left:1.5px solid var(--primary);margin-left:1px"></span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span class="muted" style="font-size:10px">↵ add to request</span><button class="btn" style="padding:2px 8px">Add</button></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><b>Change request</b><span class="muted">2 notes · 1 screen</span></div>
+          <div class="note"><span class="n">1</span><div><p>Primary button should say "Send invite"</p><small>Change · button "Invite" · desktop light</small></div></div>
+          <div class="note"><span class="n b">2</span><div><p>Email error overlaps the field on mobile</p><small>Bug · region · mobile dark</small></div></div>
+          <div class="split"><button class="btn primary">⧉ Copy for agent</button><button class="btn primary">▾</button></div>
+          <div class="muted" style="font-size:10.5px;line-height:1.35">Markdown · JSON · Send to T3 thread<br>Saved to <span class="mono">.spider/requests/cr-7/</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cli">
+    <div class="term"><div class="th">Terminal <span class="tagx">interactive</span></div><pre><span class="p">$ </span><span class="c">spider-web note "admin:/admin/admins#invite-admin-dialog" \
+    --element testid=admin-invite-submit --kind change \
+    "Primary button should say 'Send invite'"</span>
+<span class="ok">✓</span> Note n-12 pinned to button "Invite"  <span class="dm">tray: 2 notes</span>
+
+<span class="p">$ </span><span class="c">spider-web request create --title "Invite dialog polish"</span>
+<span class="ok">✓</span> cr-7 · 2 notes  <span class="dm">.spider/requests/cr-7/</span>
+<span class="p">$ </span><span class="c">spider-web request show cr-7 | pbcopy</span>   <span class="dm"># the Markdown prompt</span></pre></div>
+    <div class="term"><div class="th">Agent <span class="tagx">pulls open requests itself</span></div><pre><span class="p">$ </span><span class="c">spider-web requests --status open --json</span>
+[{<span class="k">"id"</span>:<span class="s">"cr-7"</span>,<span class="k">"title"</span>:<span class="s">"Invite dialog polish"</span>,<span class="k">"notes"</span>:<span class="nm">2</span>,
+  <span class="k">"prompt"</span>:<span class="s">".spider/requests/cr-7/request.md"</span>}]
+
+<span class="p">$ </span><span class="c">spider-web request show cr-7 --json</span>
+{<span class="k">"notes"</span>:[{<span class="k">"kind"</span>:<span class="s">"change"</span>,<span class="k">"text"</span>:<span class="s">"Primary button should say 'Send invite'"</span>,
+  <span class="k">"element"</span>:{<span class="k">"role"</span>:<span class="s">"button"</span>,<span class="k">"name"</span>:<span class="s">"Invite"</span>,<span class="k">"testId"</span>:<span class="s">"admin-invite-submit"</span>,<span class="k">"box"</span>:[<span class="nm">1104</span>,<span class="nm">640</span>,<span class="nm">120</span>,<span class="nm">36</span>]},
+  <span class="k">"source"</span>:<span class="s">"resources/js/pages/Admin/Admins/Index.tsx"</span>,<span class="k">"crop"</span>:<span class="s">"…/cr-7/1-crop.png"</span>,
+  <span class="k">"repro"</span>:{<span class="k">"url"</span>:<span class="s">"/admin/admins"</span>,<span class="k">"as"</span>:<span class="s">"admin"</span>,<span class="k">"steps"</span>:[{<span class="k">"click"</span>:{<span class="k">"testId"</span>:<span class="s">"admin-invite"</span>}}]}}, …]}
+
+<span class="p">$ </span><span class="c">spider-web request done cr-7 --verify --json</span>
+{<span class="k">"id"</span>:<span class="s">"cr-7"</span>,<span class="k">"verified"</span>:<span class="nm">true</span>,<span class="k">"changedNotes"</span>:[<span class="nm">1</span>,<span class="nm">2</span>],<span class="k">"diffs"</span>:[<span class="s">"…/diffs/admins-desktop-light.png"</span>]}</pre></div>
+  </div>
+</section>
+
+<!-- 4. JOURNEYS -->
+<section>
+  <div>
+    <div class="eyebrow">4 · Journeys and prototyping</div>
+    <h2>Record a flow, replay it on every crawl, click through it as a prototype</h2>
+    <p class="lede">A dashed step is a proposal: a marked-up screenshot or an image that the agent should build. After a replay, the proposal and the real screen show side by side.</p>
+  </div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="title">Journeys</span><span class="muted">· Admin invites an owner</span><span class="sp"></span><button class="btn ghost" style="padding:2px 8px">⏺ Record</button><button class="btn" style="padding:2px 8px">▶ Play</button></div>
+    <div class="main">
+      <div class="jhead"><span class="t">Admin invites an owner</span><span class="pill">admin</span><span class="pill">5 steps</span><span class="pill bad">broken at step 3</span><span style="flex:1"></span><button class="btn ghost" style="padding:2px 8px">Export HTML</button></div>
+      <div class="strip">
+        <div class="card"><span class="num">1</span><div class="ph"><div class="tb"></div><div class="ln s"></div><div class="blk"></div><div class="blk"></div><div class="hot" style="left:6px;top:26px;width:44%;height:14px"></div></div><div class="act">Open projects<code>goto /admin/projects</code></div></div>
+        <div class="card"><span class="num">2</span><div class="ph"><div class="tb"></div><div class="ln m"></div><div class="blk"></div><div class="hot" style="left:6px;top:31px;width:30%;height:14px"></div></div><div class="act">Click "alpha"<code>link "alpha"</code></div></div>
+        <div class="card fail"><span class="num" style="color:var(--destructive)">3 · not found</span><div class="ph"><div class="tb"></div><div class="ln s"></div><div class="blk"></div><div class="ln m"></div></div><div class="act">Click "Invite owner"<code>testid=owner-invite</code></div></div>
+        <div class="card"><span class="num">4</span><div class="ph" style="opacity:.45"><div class="tb"></div><div class="blk"></div><div class="blk"></div></div><div class="act muted">Fill email<code>textbox "Email"</code></div></div>
+        <div class="card proposed"><span class="num" style="color:var(--info)">5 · proposed</span><div class="ph"><div class="sketch">"Invite sent" toast + pending row</div></div><div class="act">Confirmation<code>sketch on a step 2 screenshot</code></div></div>
+      </div>
+      <div class="runs"><span class="muted">Replays</span><span class="tick"><i></i><i></i><i></i><i></i><i class="p"></i></span><span class="mono muted">Nov 14</span><span class="tick"><i></i><i></i><i class="f"></i><i class="p"></i><i class="p"></i></span><span class="mono muted">today</span><span style="flex:1"></span><button class="btn" style="padding:2px 8px">Send step 5 as request</button></div>
+    </div>
+  </div>
+  <div class="cli">
+    <div class="term"><div class="th">Terminal <span class="tagx">interactive</span></div><pre><span class="p">$ </span><span class="c">spider-web journey record "Admin invites an owner" --as admin</span>
+  Recording in the browser. Close the window to finish.
+  1  goto   /admin/projects
+  2  click  link "alpha"
+  3  click  button "Invite owner"   <span class="dm">[data-testid=owner-invite]</span>
+  4  fill   textbox "Email" = <span class="s">owner@example.test</span>
+<span class="ok">✓</span> Saved .spider/journeys/invite-owner.json  <span class="dm">4 steps</span>
+
+<span class="p">$ </span><span class="c">spider-web journey propose invite-owner --after 4 \
+    --image confirm-sketch.png "Show an 'Invite sent' toast and a pending row"</span>
+<span class="ok">✓</span> Step 5 added as a proposal
+<span class="p">$ </span><span class="c">spider-web journey export invite-owner --html prototype.html</span></pre></div>
+    <div class="term"><div class="th">Agent <span class="tagx">exit 1 when a journey breaks</span></div><pre><span class="p">$ </span><span class="c">spider-web journey run invite-owner --json</span>
+{<span class="k">"journey"</span>:<span class="s">"invite-owner"</span>,<span class="k">"status"</span>:<span class="s">"broken"</span>,<span class="k">"step"</span>:<span class="nm">3</span>,
+ <span class="k">"error"</span>:<span class="s">"button \"Invite owner\" [testid=owner-invite] not found"</span>,
+ <span class="k">"shot"</span>:<span class="s">".spider/runs/…/journeys/invite-owner/3.png"</span>,
+ <span class="k">"proposed"</span>:[{<span class="k">"step"</span>:<span class="nm">5</span>,<span class="k">"text"</span>:<span class="s">"Show an 'Invite sent' toast and a pending row"</span>,<span class="k">"image"</span>:<span class="s">"…/5-proposal.png"</span>}]}
+<span class="er">exit 1</span></pre></div>
+  </div>
+</section>
+
+<!-- 5. REVIEW -->
+<section>
+  <div>
+    <div class="eyebrow">5 · Review</div>
+    <h2>See what changed, then accept, mask or annotate it</h2>
+    <p class="lede">A review compares against the last accepted baseline. Accepting makes the new screenshot the baseline. Masking stops that area from counting as a change again.</p>
+  </div>
+  <div class="win">
+    <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><span class="title">Review</span><span class="muted">· baseline → working tree</span><span class="sp"></span><span class="pill mod">3 modified</span><span class="pill add">1 added</span></div>
+    <div class="main">
+      <div class="review">
+        <div class="chg">
+          <div class="it on"><span class="r">/admin/admins #invite</span><span><span class="pill mod">2.1%</span> <span class="muted">desktop · light</span></span></div>
+          <div class="it"><span class="r">/admin/projects</span><span><span class="pill mod">0.4%</span> <span class="muted">mobile · dark</span></span></div>
+          <div class="it"><span class="r">/admin/admins</span><span><span class="pill mod">0.2%</span> <span class="muted">desktop · dark</span></span></div>
+          <div class="it"><span class="r">…/:project/billing</span><span><span class="pill add">new screen</span></span></div>
+          <div class="it"><span class="r">invite-owner journey</span><span><span class="pill bad">broken · step 3</span></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="slider">
+            <div class="half l"><div class="ln" style="height:6px;width:50%;background:var(--border);border-radius:3px"></div><div class="field">Name</div><div class="field">Email</div><span class="bbtn">Invite</span></div>
+            <div class="half rr"><div class="ln" style="height:6px;width:50%;background:var(--border);border-radius:3px"></div><div class="field">Name</div><div class="field">Email</div><span class="bbtn new">Send invite</span></div>
+            <div class="handle"></div>
+            <span class="tag" style="left:8px">Before</span><span class="tag" style="right:8px">After</span>
+          </div>
+          <div class="acts"><span class="seg"><span class="on">Slider</span><span>Before</span><span>After</span><span>Diff</span></span><span style="flex:1"></span><button class="btn">Mask area</button><button class="btn">Annotate</button><button class="btn primary">Accept</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cli">
+    <div class="term"><div class="th">Terminal <span class="tagx">interactive</span></div><pre><span class="p">$ </span><span class="c">spider-web review</span>
+  <span class="wn">modified</span>  admin:/admin/admins#invite-admin-dialog  <span class="dm">desktop-light 2.1%</span>
+  <span class="wn">modified</span>  admin:/admin/projects                <span class="dm">mobile-dark 0.4%</span>
+  <span class="ok">added</span>     admin:/admin/projects/:project/billing
+  <span class="er">broken</span>    journey invite-owner                       <span class="dm">step 3</span>
+  3 modified · 1 added · 11 unchanged  <span class="dm">→ spider-web view</span>
+<span class="p">$ </span><span class="c">spider-web accept admin:/admin/projects</span>
+<span class="p">$ </span><span class="c">spider-web mask admin:/admin/projects --css '.last-synced'</span></pre></div>
+    <div class="term"><div class="th">Agent <span class="tagx">exit code works like diff</span></div><pre><span class="p">$ </span><span class="c">spider-web review --changed-since HEAD --json</span>   <span class="dm"># only screens whose source changed</span>
+{<span class="k">"summary"</span>:{<span class="k">"modified"</span>:<span class="nm">1</span>,<span class="k">"added"</span>:<span class="nm">0</span>,<span class="k">"removed"</span>:<span class="nm">0</span>,<span class="k">"broken"</span>:<span class="nm">0</span>},
+ <span class="k">"changes"</span>:[{<span class="k">"screen"</span>:<span class="s">"admin:/admin/admins#invite-admin-dialog"</span>,<span class="k">"variant"</span>:<span class="s">"desktop-light"</span>,
+   <span class="k">"diffRatio"</span>:<span class="nm">0.021</span>,<span class="k">"regions"</span>:[[<span class="nm">1104</span>,<span class="nm">640</span>,<span class="nm">120</span>,<span class="nm">36</span>]],
+   <span class="k">"before"</span>:<span class="s">"…/before.png"</span>,<span class="k">"after"</span>:<span class="s">"…/after.png"</span>,<span class="k">"diff"</span>:<span class="s">"…/diff.png"</span>}]}
+<span class="wn">exit 1</span></pre></div>
+  </div>
+</section>
+
+<!-- CONVENTIONS -->
+<section>
+  <div>
+    <div class="eyebrow">CLI rules</div>
+    <h2>Same features, built so agents can use them</h2>
+  </div>
+  <div class="conv">
+    <div><b>One shape for every command</b><span>Human-readable in a terminal. <code>--json</code> prints a single result object on stdout; progress goes to stderr as one JSON event per line.</span></div>
+    <div><b>Never blocks</b><span>No prompts when there's no terminal. Anything only a person can do returns exit 3 with a <code>next</code> hint saying what to ask the user.</span></div>
+    <div><b>Points to files</b><span>Results give absolute PNG and bundle paths, so an agent can show them as Markdown images in T3.</span></div>
+    <div><b>Exit codes</b>
+      <div class="codes"><code>0</code><span>done, nothing changed</span><code>1</code><span>visual changes or a broken journey</span><code>2</code><span>error (bad config, app down)</span><code>3</code><span>needs a person (sign-in)</span></div>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
