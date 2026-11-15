@@ -4,7 +4,7 @@
 //    and exit codes carry the outcome (0 nothing changed, 1 changes, 2 error, 3 needs a person).
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { checkRoutes, lastRouteCheck } from './check.ts';
@@ -12,15 +12,18 @@ import { ConfigError, CONFIG_FILE, findProjectRoot, loadProject, writeConfig, ty
 import { variantId, type CrawlEvent, type ElementInfo, type RouteCheck } from './contracts.ts';
 import { NeedsSignInError } from './crawl.ts';
 import { manualLogin } from './login.ts';
+import { detectApp } from './setup.ts';
 import { updateMasks } from './mask.ts';
 import { acceptAndRecompare, compareRefs, projectInfo, runCrawl, runReview, type ChangeSummary, type ReviewResult } from './ops.ts';
 import { BASELINE, ensureDataDir, readJson, Store } from './store.ts';
+import { urlProject } from './url-project.ts';
 
 const EXIT = { ok: 0, changes: 1, error: 2, person: 3 } as const;
 
 const HELP = `spider-web: map a web app's screens, review visual changes, hand them to agents.
 
 Run with no command to open the app (http://localhost:4320). Without a spider.json, the app starts with setup.
+Use --url example.com to open a saved website project in ~/.spider/projects/ (or -C DIR).
 
 Set up
   init     --url URL [--name N] [--app DIR] [--persona P] [--login manual] [--route GLOB]… [--exclude GLOB]… [--param K=V]…
@@ -147,7 +150,7 @@ async function main(): Promise<number> {
     const { values, positionals } = parsed;
     const [command, ...args] = positionals;
     const out = new Output(Boolean(values.json));
-    const cwd = resolve(values.project ?? process.cwd());
+    let cwd = resolve(values.project ?? process.cwd());
 
     if (values.help || command === 'help') {
         console.log(HELP);
@@ -155,6 +158,26 @@ async function main(): Promise<number> {
     }
 
     try {
+        if (values.url && command !== 'init') {
+            if (command !== undefined && command !== 'serve' && command !== 'view') {
+                return fail(out, 'usage', '--url is supported with init, serve, or no command.', 'spider-web --url example.com');
+            }
+            const target = urlProject(values.url);
+            cwd = values.project ? cwd : target.root;
+            if (existsSync(join(cwd, CONFIG_FILE))) {
+                const project = await loadProject(cwd);
+                if (new URL(project.config.baseURL).origin !== target.baseURL) {
+                    return fail(out, 'config', `This folder is configured for ${project.config.baseURL}, not ${target.baseURL}.`, 'Choose a different -C folder, or omit -C.');
+                }
+            } else {
+                mkdirSync(cwd, { recursive: true });
+                const result = await init(out, cwd, {
+                    ...values, url: target.baseURL, seed: values.seed ?? [target.seed],
+                }, true);
+                if (result !== EXIT.ok) return result;
+            }
+            return await serve(out, cwd, values);
+        }
         switch (command) {
             case undefined:
                 if (!process.stdout.isTTY || values.json) {
@@ -217,7 +240,7 @@ function fail(out: Output, code: string, message: string, next?: string, exit: n
 
 // ---- Set up ----
 
-async function init(out: Output, cwd: string, values: Values): Promise<number> {
+async function init(out: Output, cwd: string, values: Values, quiet = false): Promise<number> {
     const existing = findProjectRoot(cwd);
     if (existing === cwd && !values.force) return fail(out, 'exists', `${join(cwd, CONFIG_FILE)} already exists.`, 'edit it in the app (spider-web), or pass --force to replace it');
     if (!values.url) {
@@ -244,24 +267,16 @@ async function init(out: Output, cwd: string, values: Values): Promise<number> {
         },
         ...(Object.keys(params).length ? { params } : {}),
     };
-    // What the app folder says about its framework.
-    const detected: string[] = [];
-    if (existsSync(join(appDir, 'artisan'))) {
-        const sail = existsSync(join(appDir, 'vendor/bin/sail'));
-        json.routes = { preset: 'laravel', command: [sail ? './vendor/bin/sail' : 'php', 'artisan', 'route:list', '--json', '--method=GET'] };
-        detected.push(`Laravel (routes via ${sail ? 'Sail' : 'php artisan'})`);
-        for (const pages of ['resources/js/pages', 'resources/js/Pages']) {
-            if (existsSync(join(appDir, pages))) {
-                json.source = { preset: 'inertia', pages, ext: '.tsx' };
-                detected.push('Inertia pages');
-                break;
-            }
-        }
-    }
+    // What the app folder says about its framework: route list, source files.
+    const found = detectApp(appDir);
+    const detected: string[] = found.summary ? [found.summary] : [];
+    if (found.routes) json.routes = found.routes;
+    if (found.source) json.source = found.source;
+    if (!found.routes && found.candidates?.length) detected.push(`no framework here; apps below: ${found.candidates.map((c) => `${c.dir} (${c.summary})`).join(', ')} — pass --app <dir>`);
     const path = writeConfig(cwd, json);
     ensureDataDir(join(cwd, '.spider'));
     const next = values.login === 'manual' ? `spider-web login ${persona}` : 'spider-web routes';
-    out.result({ config: path, detected, personas: [persona], next }, () => {
+    if (!quiet) out.result({ config: path, detected, personas: [persona], next }, () => {
         out.line(`${green('✓')} Wrote ${relative(process.cwd(), path) || path}${detected.length ? dim(`  detected: ${detected.join(', ')}`) : ''}`);
         out.line(dim(`next: ${next}`));
     });

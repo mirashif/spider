@@ -187,7 +187,28 @@ export function Setup({ initial, onDone }: { initial: SetupState; onDone: () => 
                                     spellCheck={false}
                                 />
                             </span>
-                            <span className="muted small">{detected.summary ? `Detected: ${detected.summary}` : 'No framework detected. Routes will be found by following links.'}</span>
+                            <span className="muted small">{detected.summary ? `Detected: ${detected.summary}` : detected.candidates?.length ? 'No framework in this folder, but there are apps below it:' : 'No framework detected. Routes will be found by following links.'}</span>
+                            {!detected.summary && detected.candidates && detected.candidates.length > 0 && (
+                                <span className="candidates">
+                                    {detected.candidates.map((c) => (
+                                        <button
+                                            key={c.dir}
+                                            type="button"
+                                            className="btn small"
+                                            onClick={() => {
+                                                setAppDir(c.dir);
+                                                api.detect(c.dir).then((d) => {
+                                                    setDetected(d);
+                                                    if (!nameEdited) setName(d.name ?? '');
+                                                    if (d.url && !servers.some((sv) => sv.url === url)) setUrl(d.url);
+                                                }, (e: Error) => setError(e.message));
+                                            }}
+                                        >
+                                            <FolderOpen size={12} /> {c.dir} <span className="muted">{c.summary}</span>
+                                        </button>
+                                    ))}
+                                </span>
+                            )}
                         </label>
 
                         <label className="field">

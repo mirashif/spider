@@ -9,7 +9,8 @@
     "crawl": "tsx src/cli.ts crawl",
     "review": "tsx src/cli.ts review",
     "build": "vite build --config viewer/vite.config.ts",
-    "types": "tsc --noEmit"
+    "types": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
   },
   "engines": {
     "node": ">=22"
@@ -35,6 +36,7 @@
     "vite": "7.2.7"
   },
   "bin": {
-    "spider-web": "bin/spider-web.js"
+    "spider": "bin/spider.js",
+    "spider-web": "bin/spider.js"
   }
 }

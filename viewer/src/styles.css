@@ -1678,3 +1678,9 @@ button {
         grid-template-columns: 1fr;
     }
 }
+
+.candidates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}

@@ -8,6 +8,9 @@ Status, 2026-11-15:
   - First launch: setup mode, server discovery, framework detection, the route picker, manual sign-in, first run.
   - The picker is reused for **Selection…** reviews and single-screen recrawls.
   - Masks are taken from changed areas.
+- Framework presets are done: Laravel, Rails, Django, Next.js, Nuxt, SvelteKit, Remix/React Router v7, TanStack
+  Router, Astro, SolidStart, Qwik, Gatsby, Vue Router and a best-effort client-router scan. Each has fixture tests.
+  Monorepo roots suggest their apps.
 - Next is step 3, annotations and "Copy for agent". Decisions 8–11 come first.
 
 Files next to this one:

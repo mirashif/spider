@@ -22,6 +22,7 @@ export interface Detected {
     summary?: string;
     name?: string;
     url?: string;
+    candidates?: { dir: string; summary: string }[];
 }
 
 export interface SetupState {

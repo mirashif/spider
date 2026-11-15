@@ -9,6 +9,19 @@ meaningful exit codes, no prompts). The plan and open decisions are in [docs/pla
 
 ## Quick start
 
+Open a website directly:
+
+```bash
+spider --url example.com
+spider --url http://localhost:3000
+```
+
+Missing schemes default to HTTPS. Each origin gets a saved project under `~/.spider/projects/`;
+opening it again reuses its configuration, sessions and baseline. Different protocols and ports stay separate.
+A URL path becomes the first crawl's seed when creating the project. Use `-C DIR` to choose a folder instead.
+An existing folder configured for a different origin is left untouched and reports an error.
+`spider-web` remains an alias for the same CLI.
+
 Run it in your app's repo, or in any empty folder:
 
 ```bash
@@ -39,6 +52,7 @@ From this repo, while there's no published package:
 ```bash
 pnpm install
 pnpm exec playwright install chromium
+pnpm spider --url example.com                   # open any website, no init or -C needed
 pnpm dev                                        # open setup in the current folder
 pnpm spider review -C ~/.spider/projects/example.com  # review a saved URL project
 ```
@@ -98,6 +112,30 @@ Sessions are reused while they still work.
 Keep passwords in environment variables without literal defaults, or use manual sign-in.
 Do not commit saved sessions, captures of private pages, or local project configuration.
 
+## Frameworks
+
+Setup detects the framework in the app folder. In a monorepo root, it offers the apps below it (`apps/web`…). The
+preset reads the route list, so URLs fold into screens, the picker shows every page, and unreached pages are
+reported. File-based presets also link each screen to the file that renders it.
+
+| Preset | Reads | Source links |
+| --- | --- | --- |
+| `laravel` | `artisan route:list` (Sail when present) | Inertia page components |
+| `rails` | `bin/rails routes` | |
+| `django` | `manage.py show_urls` (needs django-extensions) | |
+| `nextjs` | `app/**/page.tsx` and `pages/` | ✓ |
+| `nuxt` | `pages/` or `app/pages/` | ✓ |
+| `sveltekit` | `src/routes/**/+page.svelte` | ✓ |
+| `remix` | `app/routes` flat routes, or React Router v7 `app/routes.ts` | ✓ |
+| `tanstack-router` | `routeTree.gen.ts`, else `src/routes` files | ✓ |
+| `astro` | `src/pages` (endpoints skipped) | ✓ |
+| `solid-start`, `qwik`, `gatsby` | their route folders | ✓ |
+| `vue-router` | file routes (unplugin-vue-router), else router config | best effort |
+| `router-scan` | React Router library mode, Angular, Solid Router, wouter: paths in route definitions | best effort |
+
+Without a preset, the sitemap and the links on the pages are used, and patterns like `/author/:author` are guessed.
+Set `routes.dir` when the routes folder isn't the framework's default.
+
 ## How it works
 
 1. **Routes.** The app's route list (Laravel's `route:list`, `sitemap.xml`, or a hook) decides which URLs count as the
@@ -127,8 +165,9 @@ src/mask.ts          masks: element under a changed area → selector
 src/baseline.ts      accepting into the baseline
 src/compare.ts       pixel diff and change regions
 src/config.ts        spider.json + spider.config.ts loading
-src/presets/         framework knowledge: Laravel routes, sitemap, Inertia source files
+src/presets/         framework presets: route lists and source files per framework
 src/contracts.ts     data shapes shared with the viewer
+test/                preset fixtures and route tests (pnpm test)
 viewer/              React + Vite + React Flow
 docs/                plan, mockups, chat-card prototype
 ```

@@ -1,10 +1,13 @@
-// Framework-specific knowledge lives here, not in the crawler: where route lists come from and how pages map to files.
+// Framework knowledge lives here, not in the crawler: where route lists come from and how pages map to files.
+// The framework presets themselves are in ./frameworks.ts.
 
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProjectConfig } from '../config.ts';
 import { matchesAny } from '../patterns.ts';
+import { presetById } from './frameworks.ts';
+
+export { detectPreset, parseDjangoUrls, parseLaravelRoutes, parseRailsRoutes, PRESETS, presetById, type PresetId } from './frameworks.ts';
 
 export interface RoutePatterns {
     patterns: string[];
@@ -14,6 +17,9 @@ export interface RoutePatterns {
     samples?: string[];
 }
 
+// The file behind each route, per app folder, from the last route list read (file-based presets know it).
+const routeFiles = new Map<string, Map<string, string>>();
+
 /** The app's route patterns, from a hook, a preset, or the sitemap. Excluded routes are kept; callers decide. */
 export async function loadRoutePatterns(config: ProjectConfig): Promise<RoutePatterns> {
     const extra = config.routes?.extra ?? [];
@@ -21,31 +27,17 @@ export async function loadRoutePatterns(config: ProjectConfig): Promise<RoutePat
         const patterns = await config.hooks.routes({ appDir: config.appDir });
         return { patterns: [...extra, ...patterns], source: 'hook', detail: 'spider.config.ts routes()' };
     }
-    if (config.routes?.preset === 'laravel') {
-        const command = config.routes.command ?? ['php', 'artisan', 'route:list', '--json', '--method=GET'];
-        const output = execFileSync(command[0], command.slice(1), { cwd: config.appDir, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-        return { patterns: [...extra, ...parseLaravelRoutes(output, config.routes.domain)], source: 'preset', detail: `laravel: ${command.join(' ')}` };
+    const preset = config.routes?.preset && config.routes.preset !== 'sitemap' ? presetById(config.routes.preset) : undefined;
+    if (preset) {
+        const options = { dir: config.routes?.dir, command: config.routes?.command, domain: config.routes?.domain };
+        const entries = preset.routes(config.appDir, options);
+        routeFiles.set(config.appDir, new Map(entries.flatMap((e) => (e.file ? [[e.pattern, e.file] as const] : []))));
+        const how = preset.describe?.(config.appDir, options);
+        return { patterns: [...extra, ...entries.map((e) => e.pattern)], source: 'preset', detail: `${preset.label}${how ? ` · ${how}` : ''}` };
     }
     const sitemap = await readSitemap(config.baseURL);
     if (sitemap.length) return { patterns: [...extra], source: 'sitemap', detail: `${config.baseURL}/sitemap.xml`, samples: sitemap };
-    return { patterns: extra, source: extra.length ? 'preset' : 'none' };
-}
-
-/**
- * Laravel `route:list --json` → GET route patterns. With `domain`, only routes registered for that domain, when the
- * app registers any (multi-domain apps); most apps register none, and then every route counts.
- */
-export function parseLaravelRoutes(output: string, domain?: string): string[] {
-    const rows = JSON.parse(output) as { domain: string | null; method: string; uri: string }[];
-    const strict = domain !== undefined && rows.some((row) => row.domain === domain);
-    const patterns = new Set<string>();
-    for (const row of rows) {
-        if (!row.method.split('|').includes('GET')) continue;
-        if (strict && row.domain !== domain) continue;
-        const path = `/${row.uri}`.replace(/^\/+/, '/').replace(/\{(\w+)(\?)?\}/g, (_, name: string, optional?: string) => `:${name}${optional ?? ''}`);
-        patterns.add(path);
-    }
-    return [...patterns].sort();
+    return { patterns: extra, source: extra.length ? 'preset' : 'none', detail: extra.length ? 'routes.extra in spider.json' : undefined };
 }
 
 async function readSitemap(baseURL: string): Promise<string[]> {
@@ -70,6 +62,8 @@ export function sourceFileFor(config: ProjectConfig, page: { component?: string;
     if (!file && config.source?.preset === 'inertia' && page.component) {
         file = `${config.source.pages ?? 'resources/js/pages'}/${page.component}${config.source.ext ?? '.tsx'}`;
     }
+    // File-based routers: the route's own file.
+    if (!file) file = routeFiles.get(config.appDir)?.get(page.route.replace(/#.*$/, ''));
     if (file && !existsSync(join(config.appDir, file))) return undefined;
     return file;
 }

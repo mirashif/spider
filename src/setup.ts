@@ -1,11 +1,12 @@
 // First launch: find the app, read what its folder says about its framework, check its routes before anything is
 // saved, and turn the picker's selection into a spider.json.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DATA_DIR_NAME, resolveConfig, type PersonaJson, type Project, type SpiderJson } from './config.ts';
 import type { ColorScheme, RouteCheck, ViewportSpec } from './contracts.ts';
+import { detectPreset, type PresetId } from './presets/frameworks.ts';
 
 export interface FoundServer {
     url: string;
@@ -17,7 +18,8 @@ export interface FoundServer {
 
 export interface Detected {
     appDir: string;
-    framework?: 'laravel' | 'next' | 'nuxt' | 'sveltekit' | 'remix' | 'astro' | 'rails' | 'django' | 'vite';
+    /** The framework preset that reads this app's routes. */
+    framework?: PresetId;
     /** A human line for the UI, e.g. "Laravel · routes via Sail · Inertia pages". */
     summary?: string;
     name?: string;
@@ -25,6 +27,8 @@ export interface Detected {
     url?: string;
     routes?: SpiderJson['routes'];
     source?: SpiderJson['source'];
+    /** In a monorepo root: app folders below it that have a framework, e.g. apps/web. */
+    candidates?: { dir: string; summary: string }[];
 }
 
 /** Everything the setup screens collect. */
@@ -73,66 +77,92 @@ export async function discoverServers(ownPort?: number): Promise<FoundServer[]> 
     return found.filter((s): s is FoundServer => Boolean(s));
 }
 
+/** Usual dev-server ports, for a URL guess when nothing says otherwise. */
+const DEFAULT_PORTS: Partial<Record<PresetId, number>> = {
+    rails: 3000,
+    django: 8000,
+    nextjs: 3000,
+    nuxt: 3000,
+    sveltekit: 5173,
+    remix: 5173,
+    'tanstack-router': 3000,
+    astro: 4321,
+    'solid-start': 3000,
+    qwik: 5173,
+    gatsby: 8000,
+    'vue-router': 5173,
+    'router-scan': 5173,
+};
+
 /** What an app folder says about itself. Nothing here is required; it only fills in better defaults. */
-export function detectApp(appDir: string): Detected {
+export function detectApp(appDir: string, options: { lookBelow?: boolean } = {}): Detected {
     const dir = resolve(appDir);
     const has = (file: string) => existsSync(join(dir, file));
     const read = (file: string) => (has(file) ? readFileSync(join(dir, file), 'utf8') : '');
-    const pkg = safeJson<{ name?: string; scripts?: Record<string, string>; dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>(read('package.json'));
-    const deps = { ...pkg?.dependencies, ...pkg?.devDependencies };
+    const pkg = safeJson<{ name?: string; scripts?: Record<string, string> }>(read('package.json'));
     const out: Detected = { appDir: dir };
+    const preset = detectPreset(dir);
 
-    if (has('artisan')) {
-        const sail = has('vendor/bin/sail');
-        out.framework = 'laravel';
-        out.routes = { preset: 'laravel', command: [sail ? './vendor/bin/sail' : 'php', 'artisan', 'route:list', '--json', '--method=GET'] };
-        const parts = ['Laravel', `routes via ${sail ? 'Sail' : 'php artisan'}`];
-        for (const pages of ['resources/js/pages', 'resources/js/Pages']) {
-            if (has(pages)) {
-                const ext = has(`${pages}/Welcome.vue`) || deps.vue ? '.vue' : deps.svelte ? '.svelte' : '.tsx';
-                out.source = { preset: 'inertia', pages, ext };
-                parts.push('Inertia pages');
-                break;
+    if (preset) {
+        out.framework = preset.id;
+        const routes: NonNullable<SpiderJson['routes']> = { preset: preset.id };
+        if (preset.command) routes.command = preset.command(dir);
+        if (preset.exclude) routes.exclude = preset.exclude;
+        out.routes = routes;
+        const parts = [preset.label];
+        try {
+            const how = preset.describe?.(dir, { command: routes.command });
+            if (how) parts.push(how);
+        } catch {
+            /* describing is best effort */
+        }
+        if (preset.id === 'laravel') {
+            for (const pages of ['resources/js/pages', 'resources/js/Pages']) {
+                if (has(pages)) {
+                    const ext = existsSync(join(dir, pages, 'Welcome.vue')) ? '.vue' : '.tsx';
+                    out.source = { preset: 'inertia', pages, ext };
+                    parts.push('Inertia pages');
+                    break;
+                }
             }
+            const env = read('.env');
+            const envValue = (key: string) => env.match(new RegExp(`^${key}=(.+)$`, 'm'))?.[1]?.trim().replace(/^["']|["']$/g, '') || undefined;
+            out.url = envValue('APP_URL');
+            const appName = envValue('APP_NAME');
+            if (appName && appName !== 'Laravel') out.name = appName;
+            try {
+                const domain = out.url ? new URL(out.url).hostname : undefined;
+                if (domain) routes.domain = domain;
+            } catch {
+                /* not a URL */
+            }
+            out.name ??= safeJson<{ name?: string }>(read('composer.json'))?.name?.split('/').pop();
         }
         out.summary = parts.join(' · ');
-        const env = read('.env');
-        const envValue = (key: string) => env.match(new RegExp(`^${key}=(.+)$`, 'm'))?.[1]?.trim().replace(/^["']|["']$/g, '') || undefined;
-        out.url = envValue('APP_URL');
-        const appName = envValue('APP_NAME');
-        if (appName && appName !== 'Laravel') out.name = appName;
-        out.name ??= safeJson<{ name?: string }>(read('composer.json'))?.name?.split('/').pop();
-    } else if (deps.next) {
-        out.framework = 'next';
-        out.summary = 'Next.js';
-    } else if (deps.nuxt) {
-        out.framework = 'nuxt';
-        out.summary = 'Nuxt';
-    } else if (deps['@sveltejs/kit']) {
-        out.framework = 'sveltekit';
-        out.summary = 'SvelteKit';
-    } else if (deps['@remix-run/react'] || deps['react-router']) {
-        out.framework = 'remix';
-        out.summary = deps['@remix-run/react'] ? 'Remix' : 'React Router';
-    } else if (deps.astro) {
-        out.framework = 'astro';
-        out.summary = 'Astro';
-    } else if (has('config/routes.rb')) {
-        out.framework = 'rails';
-        out.summary = 'Rails';
-    } else if (has('manage.py')) {
-        out.framework = 'django';
-        out.summary = 'Django';
-    } else if (deps.vite) {
-        out.framework = 'vite';
-        out.summary = 'Vite app';
     }
-    // A dev script that names its port is a decent guess at the URL.
+    // A dev script that names its port is a decent guess at the URL; else the framework's usual port.
     if (!out.url && pkg?.scripts) {
         const port = Object.values(pkg.scripts).join(' ').match(/(?:--port[= ]|-p )(\d{2,5})/)?.[1];
         if (port) out.url = `http://localhost:${port}`;
     }
-    out.name ??= pkg?.name ?? basename(dir);
+    if (!out.url && preset && DEFAULT_PORTS[preset.id]) out.url = `http://localhost:${DEFAULT_PORTS[preset.id]}`;
+    out.name ??= pkg?.name?.replace(/^@[^/]+\//, '') ?? basename(dir);
+
+    // Monorepo root with no framework of its own: point at the apps below it.
+    if (!preset && options.lookBelow !== false) {
+        const candidates: Detected['candidates'] = [];
+        for (const group of ['apps', 'packages', 'sites', 'web', 'frontend', 'client']) {
+            const groupDir = join(dir, group);
+            if (!existsSync(groupDir)) continue;
+            const children = has(join(group, 'package.json')) ? [''] : readdirSync(groupDir).filter((n) => !n.startsWith('.'));
+            for (const child of children) {
+                const sub = join(group, child);
+                const found = detectPreset(join(dir, sub));
+                if (found) candidates.push({ dir: sub, summary: found.label });
+            }
+        }
+        if (candidates.length) out.candidates = candidates.slice(0, 8);
+    }
     return out;
 }
 
@@ -149,24 +179,10 @@ export function draftJson(root: string, baseURL: string, appDir: string | undefi
         baseURL: baseURL.replace(/\/$/, ''),
         ...(appDir && appPath(root, appDir) !== '.' ? { app: appPath(root, appDir) } : {}),
         personas: { visitor: { seeds: ['/'] } },
-        ...(detected?.routes ? { routes: { ...detected.routes, ...routeDefaults(detected) } } : {}),
+        ...(detected?.routes ? { routes: detected.routes } : {}),
         ...(detected?.source ? { source: detected.source } : {}),
         ...(params && Object.keys(params).length ? { params } : {}),
     };
-}
-
-function routeDefaults(detected: Detected): Partial<NonNullable<SpiderJson['routes']>> {
-    // Laravel lists API and health routes alongside pages; start with the usual suspects hidden.
-    if (detected.framework === 'laravel') {
-        let domain: string | undefined;
-        try {
-            domain = detected.url ? new URL(detected.url).hostname : undefined;
-        } catch {
-            /* not a URL */
-        }
-        return { exclude: ['/api/**', '/up', '/sanctum/**', '/_ignition/**', '/telescope/**', '/horizon/**', '/storage/**'], ...(domain ? { domain } : {}) };
-    }
-    return {};
 }
 
 /** The picker's selection → spider.json: a visitor for open routes, a signing-in persona for walled ones. */

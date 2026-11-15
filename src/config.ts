@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ColorScheme, ViewportSpec } from './contracts.ts';
 import { maybeRegExp, toRegExp } from './patterns.ts';
+import type { PresetId } from './presets/frameworks.ts';
 
 export const CONFIG_FILE = 'spider.json';
 export const HOOKS_FILE = 'spider.config.ts';
@@ -46,11 +47,13 @@ export interface StateJson {
 }
 
 export interface RoutesJson {
-    /** Where the app's route list comes from. */
-    preset: 'laravel' | 'sitemap';
-    /** laravel: the command that prints `route:list --json`, run in the app folder. */
+    /** Where the app's route list comes from: a framework preset, or the sitemap (plus `extra`). */
+    preset: PresetId | 'sitemap';
+    /** File-based presets: the routes folder relative to the app folder, when it isn't the framework's default. */
+    dir?: string;
+    /** laravel, rails, django: the command that prints the route list, run in the app folder. */
     command?: string[];
-    /** laravel: only routes registered for this domain. */
+    /** laravel: only routes registered for this domain, when the app registers any. */
     domain?: string;
     /** Routes to leave out (API, downloads…): globs. Hidden in the route picker. */
     exclude?: string[];

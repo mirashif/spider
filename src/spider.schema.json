@@ -3,61 +3,196 @@
   "title": "spider.json",
   "description": "A spider-web project. The app edits this file; spider.config.ts (optional) adds code-only hooks: routes(), sourceFile(), login steps. Path patterns are globs (/admin/** matches /admin and below; * is one segment); prefix with re: for a regex. Any string can read the environment with ${NAME} or ${NAME:-default}.",
   "type": "object",
-  "required": ["baseURL", "personas"],
+  "required": [
+    "baseURL",
+    "personas"
+  ],
   "properties": {
-    "name": { "type": "string", "description": "Shown in the app and reports." },
-    "baseURL": { "type": "string", "description": "Where the app runs, e.g. http://localhost:3000" },
-    "app": { "type": "string", "description": "The app's own folder, relative to this file: git info, route lists, source links. Default \".\"." },
-    "prepare": { "type": "string", "description": "Shell command run in the app folder before each crawl, e.g. rebuild assets. Skip with --skip-prepare." },
+    "name": {
+      "type": "string",
+      "description": "Shown in the app and reports."
+    },
+    "baseURL": {
+      "type": "string",
+      "description": "Where the app runs, e.g. http://localhost:3000"
+    },
+    "app": {
+      "type": "string",
+      "description": "The app's own folder, relative to this file: git info, route lists, source links. Default \".\"."
+    },
+    "prepare": {
+      "type": "string",
+      "description": "Shell command run in the app folder before each crawl, e.g. rebuild assets. Skip with --skip-prepare."
+    },
     "viewports": {
       "type": "array",
-      "description": "Default: desktop 1440×900 only.",
+      "description": "Default: desktop 1440\u00d7900 only.",
       "items": {
         "type": "object",
-        "required": ["id", "width", "height"],
-        "properties": { "id": { "type": "string" }, "width": { "type": "number" }, "height": { "type": "number" } }
+        "required": [
+          "id",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        }
       }
     },
-    "colorSchemes": { "type": "array", "items": { "enum": ["light", "dark"] }, "description": "Default: [\"light\"]." },
-    "clock": { "type": "string", "description": "Frozen browser time (ISO), so relative dates don't change between runs." },
-    "maxScreens": { "type": "number", "description": "Cap on screens per persona. Default 60." },
-    "maxShotHeight": { "type": "number", "description": "Cap on full-page shot height in CSS px. Default 4000." },
+    "colorSchemes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "light",
+          "dark"
+        ]
+      },
+      "description": "Default: [\"light\"]."
+    },
+    "clock": {
+      "type": "string",
+      "description": "Frozen browser time (ISO), so relative dates don't change between runs."
+    },
+    "maxScreens": {
+      "type": "number",
+      "description": "Cap on screens per persona. Default 60."
+    },
+    "maxShotHeight": {
+      "type": "number",
+      "description": "Cap on full-page shot height in CSS px. Default 4000."
+    },
     "personas": {
       "type": "object",
       "description": "Who browses the app. Each persona is crawled separately with its own session.",
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "seeds": { "type": "array", "items": { "type": "string" }, "description": "Paths the crawl starts from. Default [\"/\"]." },
-          "include": { "type": "array", "items": { "type": "string" }, "description": "Only follow paths matching one of these." },
-          "exclude": { "type": "array", "items": { "type": "string" }, "description": "Never follow paths matching one of these." },
+          "seeds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Paths the crawl starts from. Default [\"/\"]."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only follow paths matching one of these."
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Never follow paths matching one of these."
+          },
           "login": {
             "description": "\"manual\": sign in by hand with `spider-web login <persona>`. Or steps that sign in. Absent: no sign-in.",
-            "oneOf": [{ "const": "manual" }, { "type": "array", "items": { "$ref": "#/definitions/step" } }]
+            "oneOf": [
+              {
+                "const": "manual"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/step"
+                }
+              }
+            ]
           }
         }
       }
     },
     "routes": {
       "type": "object",
-      "description": "Where the app's route list comes from: used to fold URLs into screens, fill the route picker and report unreached routes. Without it, sitemap.xml or the crawl itself is used.",
-      "required": ["preset"],
+      "description": "Where the app's route list comes from: used to fold URLs into screens, fill the route picker, link screens to source files and report unreached routes. Without it, sitemap.xml or links on the pages are used.",
+      "required": [
+        "preset"
+      ],
       "properties": {
-        "preset": { "enum": ["laravel", "sitemap"] },
-        "command": { "type": "array", "items": { "type": "string" }, "description": "laravel: command printing `route:list --json`, run in the app folder." },
-        "domain": { "type": "string", "description": "laravel: only routes registered for this domain." },
-        "exclude": { "type": "array", "items": { "type": "string" }, "description": "Routes that aren't screens (APIs, downloads)." },
-        "extra": { "type": "array", "items": { "type": "string" }, "description": "More route patterns, e.g. /docs/:slug" }
+        "preset": {
+          "enum": [
+            "laravel",
+            "rails",
+            "django",
+            "nextjs",
+            "nuxt",
+            "sveltekit",
+            "remix",
+            "tanstack-router",
+            "astro",
+            "solid-start",
+            "qwik",
+            "gatsby",
+            "vue-router",
+            "router-scan",
+            "sitemap"
+          ],
+          "description": "laravel/rails/django ask their CLI; nextjs, nuxt, sveltekit, remix (and React Router v7), tanstack-router, astro, solid-start, qwik and gatsby read route files; vue-router and router-scan read route definitions in the source (best effort); sitemap uses /sitemap.xml plus `extra`."
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "laravel, rails, django: command printing the route list, run in the app folder."
+        },
+        "domain": {
+          "type": "string",
+          "description": "laravel: only routes registered for this domain."
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Routes that aren't screens (APIs, downloads)."
+        },
+        "extra": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "More route patterns, e.g. /docs/:slug"
+        },
+        "dir": {
+          "type": "string",
+          "description": "File-based presets: the routes folder relative to the app folder, when it isn't the framework's default."
+        }
       }
     },
-    "params": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Sample values for route parameters, e.g. {\"tenant\": \"alpha\"}." },
+    "params": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Sample values for route parameters, e.g. {\"tenant\": \"alpha\"}."
+    },
     "source": {
       "type": "object",
       "description": "How screens map to source files.",
       "properties": {
-        "preset": { "const": "inertia" },
-        "pages": { "type": "string", "description": "Default resources/js/pages" },
-        "ext": { "type": "string", "description": "Default .tsx" }
+        "preset": {
+          "const": "inertia"
+        },
+        "pages": {
+          "type": "string",
+          "description": "Default resources/js/pages"
+        },
+        "ext": {
+          "type": "string",
+          "description": "Default .tsx"
+        }
       }
     },
     "states": {
@@ -65,36 +200,172 @@
       "description": "Interactions captured as their own screens (a dialog, a validation error).",
       "items": {
         "type": "object",
-        "required": ["persona", "route", "name", "steps"],
+        "required": [
+          "persona",
+          "route",
+          "name",
+          "steps"
+        ],
         "properties": {
-          "persona": { "type": "string" },
-          "route": { "type": "string" },
-          "name": { "type": "string" },
-          "steps": { "type": "array", "items": { "$ref": "#/definitions/step" } }
+          "persona": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/step"
+            }
+          }
         }
       }
     },
-    "mask": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors painted over before shots (clocks, avatars)." },
-    "css": { "type": "string", "description": "Extra CSS injected before shots." }
+    "mask": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "CSS selectors painted over before shots (clocks, avatars)."
+    },
+    "css": {
+      "type": "string",
+      "description": "Extra CSS injected before shots."
+    }
   },
   "definitions": {
     "locator": {
       "description": "Found with Playwright: by role and name, test id, text, or CSS.",
       "oneOf": [
-        { "type": "object", "required": ["role"], "properties": { "role": { "type": "string" }, "name": { "type": "string" }, "exact": { "type": "boolean" } } },
-        { "type": "object", "required": ["testId"], "properties": { "testId": { "type": "string" } } },
-        { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" } } },
-        { "type": "object", "required": ["css"], "properties": { "css": { "type": "string" } } }
+        {
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "exact": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "testId"
+          ],
+          "properties": {
+            "testId": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "css"
+          ],
+          "properties": {
+            "css": {
+              "type": "string"
+            }
+          }
+        }
       ]
     },
     "step": {
       "oneOf": [
-        { "type": "object", "required": ["goto"], "properties": { "goto": { "type": "string" } } },
-        { "type": "object", "required": ["fill", "value"], "properties": { "fill": { "$ref": "#/definitions/locator" }, "value": { "type": "string" } } },
-        { "type": "object", "required": ["click"], "properties": { "click": { "$ref": "#/definitions/locator" } } },
-        { "type": "object", "required": ["press"], "properties": { "press": { "type": "string" } } },
-        { "type": "object", "required": ["waitForURL"], "properties": { "waitForURL": { "type": "string", "description": "Glob like **/dashboard, or re:… for a regex." } } },
-        { "type": "object", "required": ["waitFor"], "properties": { "waitFor": { "$ref": "#/definitions/locator" } } }
+        {
+          "type": "object",
+          "required": [
+            "goto"
+          ],
+          "properties": {
+            "goto": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "fill",
+            "value"
+          ],
+          "properties": {
+            "fill": {
+              "$ref": "#/definitions/locator"
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "click"
+          ],
+          "properties": {
+            "click": {
+              "$ref": "#/definitions/locator"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "press"
+          ],
+          "properties": {
+            "press": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "waitForURL"
+          ],
+          "properties": {
+            "waitForURL": {
+              "type": "string",
+              "description": "Glob like **/dashboard, or re:\u2026 for a regex."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "waitFor"
+          ],
+          "properties": {
+            "waitFor": {
+              "$ref": "#/definitions/locator"
+            }
+          }
+        }
       ]
     }
   }
