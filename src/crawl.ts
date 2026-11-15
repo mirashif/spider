@@ -22,6 +22,7 @@ import { isExcludedRoute, loadRoutePatterns, sourceFileFor } from './presets/ind
 import { compilePatterns, patternCovered, routeFor } from './routes.ts';
 import { describeStep, runSteps } from './steps.ts';
 import { BASELINE, ensureDir, gitInfo, Store, writeJson } from './store.ts';
+import { settle } from './capture/settle.ts';
 
 export interface CrawlOptions {
     label?: string;
@@ -109,8 +110,11 @@ export async function crawl(project: Project, options: CrawlOptions = {}): Promi
     };
 
     const browser = await chromium.launch({ headless: !options.headed });
+    const cancel = () => { void browser.close().catch(() => undefined); };
+    options.signal?.addEventListener('abort', cancel, { once: true });
     let runDir: string | undefined;
     try {
+        options.signal?.throwIfAborted();
         // Check every session first, so a missing sign-in stops the crawl before any work, not halfway.
         emit({ type: 'phase', phase: 'sign-in' });
         const sessions = new Map<string, StorageState | undefined>();
@@ -163,6 +167,7 @@ export async function crawl(project: Project, options: CrawlOptions = {}): Promi
                 }
 
                 consoleErrors.length = 0;
+                emit({ type: 'page', persona: personaName, route: item.path, done, queued: 1 + countNew(queue, routeToScreen, failed, patterns) });
                 let response;
                 try {
                     response = await primaryPage.goto(item.path, { waitUntil: 'networkidle', timeout: 20_000 });
@@ -240,7 +245,9 @@ export async function crawl(project: Project, options: CrawlOptions = {}): Promi
             await captureStates(config, personaName, variants, screens, transitions, addGap, runDir, log, Boolean(only));
             await Promise.all(variants.map((variant) => variant.context.close()));
         }
+        options.signal?.throwIfAborted();
     } finally {
+        options.signal?.removeEventListener('abort', cancel);
         await browser.close();
     }
 
@@ -416,16 +423,6 @@ async function openVariants(browser: Browser, config: ProjectConfig, storageStat
     return variants;
 }
 
-async function settle(page: Page): Promise<void> {
-    await page.evaluate(async () => {
-        await document.fonts.ready;
-        await Promise.all(
-            [...document.images].filter((img) => !img.complete).map((img) => new Promise((resolve) => img.addEventListener('load', resolve, { once: true }))),
-        );
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
-}
-
 async function describePage(page: Page, config: ProjectConfig, route: string): Promise<{ title: string; component?: string; sourceFile?: string }> {
     const { title, component } = await page.evaluate(() => {
         let component: string | undefined;
@@ -516,6 +513,7 @@ async function shoot(page: Page, variant: Variant, runDir: string, screenId: str
           }, config.mask)
         : [];
     await page.screenshot({
+        timeout: 20_000,
         path: join(runDir, `${name}.png`),
         fullPage: true,
         clip: { x: 0, y: 0, width: variant.viewport.width, height: shotHeight },

@@ -263,7 +263,7 @@ class Jobs {
             p.phase = event.phase;
             if (event.persona && event.persona !== p.persona) Object.assign(p, { persona: event.persona, done: 0, queued: 0, route: undefined });
         }
-        if (event.type === 'screen') Object.assign(p, { persona: event.persona, done: event.done, queued: event.queued, route: event.route });
+        if (event.type === 'screen' || event.type === 'page') Object.assign(p, { persona: event.persona, done: event.done, queued: event.queued, route: event.route });
         this.emit(event);
     }
 

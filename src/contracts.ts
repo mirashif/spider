@@ -244,6 +244,7 @@ export type CrawlEvent =
     | { type: 'start'; run: string; personas: string[] }
     | { type: 'phase'; phase: 'prepare' | 'routes' | 'sign-in' | 'crawl' | 'states' | 'write'; persona?: string }
     | { type: 'screen'; persona: string; screenId: string; route: string; title: string; done: number; queued: number }
+    | { type: 'page'; persona: string; route: string; done: number; queued: number }
     | { type: 'gap'; gap: Gap }
     | { type: 'log'; message: string };
 
