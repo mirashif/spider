@@ -41,7 +41,7 @@ Look
   runs                            Runs, the baseline, comparisons.
   screens  [--run REF]            Screens in a run, with absolute shot paths.
   show     SCREEN [--run REF] [--variant V] [--elements]
-  serve    [--port N] [--no-open] The app (also: spider-web with no command).
+  serve    [--host ADDRESS] [--port N] [--no-open] The app (default host: 0.0.0.0, accessible on your network).
   explain                         What spider.json can hold.
 
 Every command: --json (one result on stdout, NDJSON progress on stderr), -C DIR (project folder).
@@ -77,6 +77,7 @@ const OPTIONS = {
     elements: { type: 'boolean' },
     refresh: { type: 'boolean' },
     port: { type: 'string' },
+    host: { type: 'string' },
     'no-open': { type: 'boolean' },
     // mask
     css: { type: 'string', multiple: true },
@@ -522,9 +523,10 @@ async function serve(out: Output, cwd: string, values: Values): Promise<number> 
         return EXIT.ok;
     }
     const { startServer } = await import('./server.ts');
-    const server = await startServer(root, project, { port: values.port ? Number(values.port) : undefined });
-    out.result({ url: server.url, project: name, setup: !project }, () => {
+    const server = await startServer(root, project, { port: values.port ? Number(values.port) : undefined, host: values.host });
+    out.result({ url: server.url, networkUrls: server.networkUrls, project: name, setup: !project }, () => {
         out.line(`${green('●')} ${bold(name)}  ${server.url}`);
+        for (const url of server.networkUrls) out.line(`  Network: ${url}`);
         if (!project) out.line(dim(`  No spider.json in ${root} yet: set it up in the app.`));
         out.line(dim('  Ctrl-C to stop'));
     });

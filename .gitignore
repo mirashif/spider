@@ -3,3 +3,16 @@ data/
 dist/
 *.log
 .DS_Store
+
+# Local configuration, sessions, captures and credentials
+.spider/
+/spider.json
+/spider.config.ts
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx

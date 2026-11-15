@@ -18,6 +18,8 @@ spider --url http://localhost:3000
 
 Missing schemes default to HTTPS. Each origin gets a saved project under `~/.spider/projects/`;
 opening it again reuses its configuration, sessions and baseline. Different protocols and ports stay separate.
+Spider listens on `0.0.0.0` by default and prints Network URLs you can open from another device on your LAN
+or Tailscale network. Use `--host 127.0.0.1` for localhost-only access, or `--host ADDRESS` to bind a specific interface.
 A URL path becomes the first crawl's seed when creating the project. Use `-C DIR` to choose a folder instead.
 An existing folder configured for a different origin is left untouched and reports an error.
 `spider-web` remains an alias for the same CLI.

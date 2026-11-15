@@ -23,7 +23,7 @@ test('URL launch creates a project, serves it, and reuses its config', { timeout
     const home = mkdtempSync(join(tmpdir(), 'spider-url-'));
     const env = { ...process.env, HOME: home };
     const args = ['bin/spider.js'];
-    const child = spawn(process.execPath, [...args, '--url', 'example.com/docs', '--json', '--no-open'], { env });
+    const child = spawn(process.execPath, [...args, '--url', 'example.com/docs', '--host', '127.0.0.1', '--json', '--no-open'], { env });
     t.after(async () => {
         if (child.exitCode === null) {
             child.kill('SIGTERM');

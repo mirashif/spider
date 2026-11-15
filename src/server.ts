@@ -5,6 +5,7 @@ import { createReadStream, existsSync, readFileSync, rmSync, statSync } from 'no
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { networkInterfaces } from 'node:os';
 import { checkRoutes, lastRouteCheck } from './check.ts';
 import { CONFIG_FILE, DATA_DIR_NAME, loadProject, writeConfig, type Project } from './config.ts';
 import type { Bounds, CrawlEvent, JobInfo } from './contracts.ts';
@@ -27,6 +28,7 @@ const MIME: Record<string, string> = {
 
 export interface ServerHandle {
     url: string;
+    networkUrls: string[];
     close: () => Promise<void>;
 }
 
@@ -197,13 +199,13 @@ export async function startServer(root: string, initial: Project | undefined, op
     // Vite's hot reload rides on this server's port, so two projects' servers never fight over a fixed one.
     viewer = await viewerMiddleware(server);
 
-    const host = options.host ?? '127.0.0.1';
+    const host = options.host ?? '0.0.0.0';
     const port = await listen(server, options.port ?? 4320, host);
     ownPort = port;
     // `localhost` resolves to ::1 first on many machines (macOS does), and some browsers don't fall back to
     // 127.0.0.1. Listen on the IPv6 loopback too, on the same port, so http://localhost works everywhere.
     let server6: ReturnType<typeof createServer> | undefined;
-    if (host === '127.0.0.1') {
+    if (host === '127.0.0.1' || host === '0.0.0.0') {
         server6 = createServer(handle);
         await new Promise<void>((done) => {
             server6!.once('error', () => {
@@ -215,7 +217,13 @@ export async function startServer(root: string, initial: Project | undefined, op
         // Hot-reload sockets opened via ::1 go to the same Vite instance.
         server6?.on('upgrade', (req, socket, head) => server.emit('upgrade', req, socket, head));
     }
-    const url = `http://${host === '127.0.0.1' || host === '0.0.0.0' ? 'localhost' : host}:${port}`;
+    const localHost = ['127.0.0.1', '0.0.0.0', '::'].includes(host) ? 'localhost' : host.includes(':') ? `[${host}]` : host;
+    const url = `http://${localHost}:${port}`;
+    const networkUrls = host === '0.0.0.0' || host === '::'
+        ? [...new Set(Object.values(networkInterfaces()).flatMap((addresses) =>
+            (addresses ?? []).filter((address) => address.family === 'IPv4' && !address.internal).map((address) => `http://${address.address}:${port}`),
+        ))]
+        : [];
     const infoPath = join(store.dataDir, 'server.json');
     ensureDataDir(store.dataDir);
     writeJson(infoPath, { url, pid: process.pid, startedAt: new Date().toISOString() });
@@ -231,6 +239,7 @@ export async function startServer(root: string, initial: Project | undefined, op
 
     return {
         url,
+        networkUrls,
         close: async () => {
             cleanup();
             await Promise.all([server, server6].map((srv) => srv && new Promise<void>((done) => {
@@ -341,7 +350,7 @@ function listen(server: ReturnType<typeof createServer>, port: number, host: str
                 if (error.code === 'EADDRINUSE' && left > 0) attempt(p + 1, left - 1);
                 else fail(error);
             });
-            server.listen(p, host, () => done(p));
+            server.listen(p, host, () => done((server.address() as { port: number }).port));
         };
         attempt(port, tries);
     });
